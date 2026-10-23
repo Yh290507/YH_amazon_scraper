@@ -17,3 +17,11 @@ def parse_rating(raw):
     if not match:
         raise ValueError(f"Note illisible : {raw!r}")
     return float(match.group(1).replace(",", "."))
+
+def parse_asin(raw):
+    """Extrait un ASIN depuis son code ou depuis un lien produit Amazon."""
+    value = clean_text(raw).upper()
+    if re.fullmatch(r"[A-Z0-9]{10}", value):
+        return value
+    match = re.search(r"/(?:dp|gp/product)/([A-Z0-9]{10})(?:[/?]|$)", value, re.IGNORECASE)
+    return match.group(1) if match else ""

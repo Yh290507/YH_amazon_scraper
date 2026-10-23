@@ -5,7 +5,7 @@ from urllib.parse import urlencode, urljoin
 from config import AMAZON_URL, CATEGORY_QUERIES, PAGES_MAX, DELAI_ENTRE_PAGES
 from app.models.produit import Product
 from app.scraper.driver import BrowserDriver
-from app.scraper.parsing import clean_text, parse_price, parse_rating
+from app.scraper.parsing import clean_text, parse_asin, parse_price, parse_rating
 
 RESULT_CARD = "div[data-component-type='s-search-result'], div.s-result-item[data-asin]:not([data-asin=''])"
 NEXT_LINKS = (
@@ -17,7 +17,8 @@ NEXT_LINKS = (
 
 class AmazonScraper:
     def __init__(self, driver=None):
-        self.driver = driver or BrowserDriver()
+        self._provided_driver = driver
+        self.driver = None
         self._has_navigated = False
 
     def _navigate(self, url):
@@ -88,11 +89,10 @@ class AmazonScraper:
 
     def scrape(self):
         products = []
-        categories = list(CATEGORY_QUERIES.items())[:PAGES_MAX]
-        if len(categories) < PAGES_MAX:
-            raise ValueError("Il faut configurer au moins PAGES_MAX catégories de recherche dans config.py.")
+        self.driver = self._provided_driver or BrowserDriver()
+        self._has_navigated = False
         try:
-            for category, query_text in categories:
+            for category, query_text in CATEGORY_QUERIES.items():
                 page_url = f"{AMAZON_URL}/s?{urlencode({'k': query_text})}"
                 for page_number in range(1, PAGES_MAX + 1):
                     print(f"Lecture page {page_number}/{PAGES_MAX} — catégorie : {category}")
@@ -113,11 +113,16 @@ class AmazonScraper:
 
                     cards = self.driver.find_all(RESULT_CARD)
                     page_products = 0
+                    page_readable = 0
+                    page_skipped = 0
                     for card in cards:
                         title = self._extract_title(card)
                         if not title:
+                            page_skipped += 1
                             continue
                         link = self._extract_link(card)
+                        asin = parse_asin(card.get_attribute("data-asin")) or parse_asin(link)
+                        page_readable += 1
                         price_text = self._first_text(card, ("span.a-price span.a-offscreen",))
                         rating_text = self._first_text(card, ("span.a-icon-alt",))
                         try:
@@ -128,12 +133,27 @@ class AmazonScraper:
                             rating = parse_rating(rating_text) if rating_text else None
                         except ValueError:
                             rating = None
+
+                        # Le CSV ne conserve que les fiches avec les données utiles
+                        # aux statistiques et un lien produit exploitable.
+                        if price is None or rating is None or not link:
+                            page_skipped += 1
+                            continue
+
                         availability = self._first_text(card, (
                             ".a-color-base.a-text-bold", "[data-cy='delivery-recipe']",
                         )) or "Non indiqué"
-                        products.append(Product(title, price, rating, availability, category, link))
+                        products.append(Product(
+                            title=title,
+                            price=price,
+                            rating=rating,
+                            availability=availability,
+                            category=category,
+                            url=link,
+                            asin=asin,
+                        ))
                         page_products += 1
-                    if not page_products:
+                    if not page_readable:
                         page_title = getattr(self.driver, "page_title", "titre indisponible")
                         current_url = getattr(self.driver, "current_url", page_url)
                         sample = " ".join(self.driver.body_text.split())[:300]
@@ -142,7 +162,10 @@ class AmazonScraper:
                             f"{len(cards)} cartes détectées; onglet={page_title!r}; URL={current_url}; "
                             f"texte reçu={sample!r}."
                         )
-                    print(f"  {page_products} produits extraits.")
+                    print(
+                        f"  {page_products} produits complets conservés; "
+                        f"{page_skipped} fiches ignorées (titre, prix, note ou lien manquant)."
+                    )
                     if page_number < PAGES_MAX:
                         next_url = self._next_page_url()
                         if not next_url:
@@ -150,6 +173,10 @@ class AmazonScraper:
                             break
                         page_url = next_url
         finally:
-            self.driver.close()
+            driver = self.driver
+            self.driver = None
+            self._has_navigated = False
+            if driver is not None:
+                driver.close()
         return products
 

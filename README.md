@@ -7,11 +7,15 @@ Projet Python de web scraping Amazon.fr organisé selon l'arborescence du profes
 - effectue trois recherches Amazon, une par catégorie configurée;
 - suit le lien « page suivante » sur chaque recherche jusqu'à trois pages au maximum;
 - attend un délai aléatoire entre chaque navigation;
-- récupère titre, prix, note, disponibilité et lien depuis les cartes de résultats;
-- écrit les données dans exports/produits.csv;
-- affiche la moyenne des prix, le prix maximum et le nombre de produits par catégorie.
+- récupère ASIN, titre, prix, note, disponibilité et lien depuis les cartes de résultats;
+- conserve dans le CSV uniquement les fiches avec un titre, un prix, une note et un lien; les fiches incomplètes sont comptées dans le terminal puis ignorées;
+- écrit les données dans exports/produits.csv, avec des en-têtes français, la catégorie et l'ASIN en tête, et les produits regroupés par catégorie;
+- affiche la moyenne des prix, le prix maximum et le nombre de produits par catégorie;
+- propose un menu pour lancer le scraping, relire les statistiques du CSV ou quitter.
 
-La catégorie correspond au groupe de recherche défini dans config.py (Livres, Informatique, Cuisine). Les notes ou prix absents restent vides dans le CSV; les prix absents sont exclus des statistiques de moyenne et de maximum.
+Les catégories sont définies dans config.py : Livres, Informatique et Cuisine. Chaque produit est classé selon la recherche qui l'a trouvé. Une fiche sans prix, sans note ou sans lien produit n'est pas enregistrée, afin que les lignes du CSV utilisées pour les statistiques soient complètes. La disponibilité reste renseignée par « Non indiqué » quand Amazon ne l'affiche pas.
+
+Dans le CSV, l'ASIN est l'identifiant Amazon du produit; il est pris dans la carte de résultat ou extrait du lien déjà collecté. « Prix (€) » affiche le prix de chaque article avec le symbole euro (par exemple `22,92 €`) et « Note (/5) » affiche sa note sur cinq (par exemple `4.2`). Le programme sait relire le prix formaté pour recalculer les statistiques. La colonne « Disponibilité » contient le texte de livraison affiché par Amazon; son éventuel montant en euros correspond aux frais ou conditions de livraison, pas au prix de l'article.
 
 ## Installation dans VS Code (Windows)
 
@@ -26,15 +30,17 @@ Prérequis : Python 3.10+, Google Chrome et l'extension Python de Microsoft dans
     pip install -r requirements.txt
     python main.py
 
+Le menu propose trois choix : lancer le scraping, afficher les statistiques du dernier CSV enregistré, ou quitter. L'affichage reste résumé; les détails des produits sont dans le fichier CSV.
+
 Si PowerShell bloque l'activation : Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass puis réessaie. Au besoin, Ctrl+Shift+P > Python: Select Interpreter et sélectionne l'interpréteur .venv.
 
 Selenium Manager prépare le pilote Chrome au premier lancement; Chrome et une connexion Internet sont nécessaires. Le CSV est exports/produits.csv.
 
 ## Configuration
 
-Dans config.py, CATEGORY_QUERIES associe les catégories aux termes de recherche, PAGES_MAX fixe le maximum de pages à suivre pour chaque recherche, DELAI_ENTRE_PAGES règle la pause et HEADLESS permet de masquer/afficher Chrome (Chrome est visible par défaut pour faciliter le diagnostic).
+Dans config.py, CATEGORY_QUERIES associe chaque catégorie à son terme de recherche, PAGES_MAX fixe le maximum de pages à suivre pour chaque recherche, DELAI_ENTRE_PAGES règle la pause aléatoire entre navigations et HEADLESS=True masque Chrome par défaut. Passe HEADLESS à False pour voir le navigateur pendant le diagnostic.
 
-## Arborescence du professeur
+## Arborescence
 
     README.md
     app/
@@ -50,11 +56,17 @@ Dans config.py, CATEGORY_QUERIES associe les catégories aux termes de recherche
     requirements.txt
     tests/__init__.py
 
-Le contrôleur orchestre le flux; les modèles représentent les données et leur sauvegarde CSV; le scraper suit la pagination et extrait les éléments; le driver pilote Selenium; les vues présentent les résultats.
+Le contrôleur orchestre le flux; les modèles représentent les produits et calculent les statistiques; le dépôt lit et écrit le CSV; le scraper suit la pagination par catégorie et extrait les éléments; le driver pilote Selenium; les vues gèrent le menu et les résultats affichés.
 
 ## Accès au site
 
-Amazon peut refuser une session automatisée ou modifier le HTML. Chrome reste visible par défaut pour que tu puisses voir la page chargée. Le programme s'arrête avec un diagnostic s'il ne détecte pas les cartes; il ne contourne pas une vérification. Vérifie que l'accès est autorisé pour le devoir.
+Amazon peut refuser une session automatisée ou modifier le HTML. Chrome est masqué par défaut; passe HEADLESS à False dans config.py pour voir la page chargée pendant le diagnostic. Le programme s'arrête avec un diagnostic s'il ne détecte pas les cartes; il ne contourne pas une vérification. Vérifie que l'accès est autorisé pour le devoir.
 
-Pour lancer les tests de parsing et de statistiques : python -m unittest discover -s tests.
+## Tests
+
+Depuis la racine du projet, lance les tests de parsing et de statistiques avec :
+
+```powershell
+python -m unittest discover -s tests
+```
 
