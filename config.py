@@ -16,7 +16,7 @@ DELAI_ENTRE_NAVIGATIONS = (8, 15)  # pause entre les navigations Selenium
 DELAI_ENTRE_IMAGES = (2, 4)  # pause entre les téléchargements d'images
 TIMEOUT = 35
 DETAIL_TIMEOUT = 10  # attente maximale pour le chargement d'une fiche produit
-HEADLESS = False  # True pour exécuter le navigateur en arrière-plan, False pour le mode visible
+HEADLESS = True  # True pour exécuter le navigateur en arrière-plan, False pour le mode visible
 
 
 def keyword_slug(keyword):
