@@ -1,5 +1,6 @@
 """Coordonne le scraping, l'enregistrement et l'affichage."""
 import csv
+import sqlite3
 from app.models.produit import Product
 
 class ScrapingController:
@@ -10,6 +11,8 @@ class ScrapingController:
         self.export_view = export_view
 
     def run(self):
+        # La première action au lancement est directement la saisie du mot-clé.
+        self.scrape_and_export()
         while True:
             choice = self.console_view.show_menu()
             if choice == "1":
@@ -23,24 +26,29 @@ class ScrapingController:
                 self.console_view.show_error("Choix invalide. Entre 1, 2 ou 3.")
 
     def scrape_and_export(self):
+        keyword = self.console_view.ask_keyword()
+        if not keyword:
+            self.console_view.show_error("Le mot-clé ne peut pas être vide.")
+            return
         try:
-            products = self.scraper.scrape()
+            products = self.scraper.scrape(keyword)
             if not products:
                 self.console_view.show_error("Aucun produit n'a été collecté.")
                 return
-            path = self.depot.save(products)
+            path = self.depot.save(products, keyword)
             self.console_view.show_results(products, Product.statistics(products))
-            self.export_view.show_saved_path(path, len(products))
+            image_count = sum(bool(product.image_path) for product in products)
+            self.export_view.show_saved_path(path, len(products), image_count)
         except Exception as exc:
             self.console_view.show_error(str(exc))
 
     def show_saved_results(self):
         try:
             products = self.depot.load()
-        except (OSError, ValueError, csv.Error) as exc:
-            self.console_view.show_error(f"Impossible de lire le CSV : {exc}")
+        except (OSError, ValueError, csv.Error, sqlite3.Error) as exc:
+            self.console_view.show_error(f"Impossible de lire les données enregistrées : {exc}")
             return
         if not products:
-            self.console_view.show_error("Aucun CSV disponible. Lance d'abord le scraping.")
+            self.console_view.show_error("Aucune collecte enregistrée. Lance d'abord une recherche.")
             return
         self.console_view.show_results(products, Product.statistics(products))

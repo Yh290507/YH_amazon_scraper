@@ -18,8 +18,8 @@ class BrowserDriver:
     def open(self, url):
         self.browser.get(url)
 
-    def wait_for(self, selector):
-        return WebDriverWait(self.browser, TIMEOUT).until(
+    def wait_for(self, selector, timeout=TIMEOUT):
+        return WebDriverWait(self.browser, timeout).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, selector))
         )
 
